@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     ollama_base_url: str
     llm_model: str
     embedding_model: str
-
+    secret_key :str
+    access_token_expire_minutes:str
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
