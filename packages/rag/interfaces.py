@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class EmbeddingProvider(ABC):
@@ -14,4 +15,26 @@ class EmbeddingProvider(ABC):
         Returns:
             One embedding vector per input string.
         """
+        pass
+
+
+
+
+
+class VectorStore(ABC):
+
+    @abstractmethod
+    def upsert(
+        self,
+        chunks: list[dict[str, Any]],
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def search(
+        self,
+        vector: list[float],
+        limit: int = 5 ,
+        filters: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         pass
