@@ -9,10 +9,12 @@ class Settings(BaseSettings):
     llm_model: str
     embedding_model: str
     secret_key :str
-    access_token_expire_minutes:str
+    database_url:str
+    access_token_expire_minutes: int
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore",
     )
 
 settings = Settings()   
