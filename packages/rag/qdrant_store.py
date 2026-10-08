@@ -19,7 +19,18 @@ class QdrantVectorStore(VectorStore):
                     distance=models.Distance.COSINE,
                 ),
             )
+    def clear(self) -> None:
+     self.client.delete_collection(
+        collection_name=self.collection_name
+    )
 
+     self.client.create_collection(
+        collection_name=self.collection_name,
+        vectors_config=models.VectorParams(
+            size=768,
+            distance=models.Distance.COSINE,
+        ),
+    )
     def upsert(self, chunks: list[dict[str, Any]]) -> None:
         points = [
             models.PointStruct(
@@ -57,12 +68,12 @@ class QdrantVectorStore(VectorStore):
                 must=conditions #type:ignore 
             )
 
-        results = self.client.search(#type:ignore 
-            collection_name=self.collection_name,
-            query_vector=vector,
-            query_filter=query_filter,
-            limit=limit,
-        )
+        results = self.client.query_points(
+    collection_name=self.collection_name,
+    query=vector,
+    query_filter=query_filter,
+    limit=limit,
+)
 
         return [
         {
@@ -70,7 +81,7 @@ class QdrantVectorStore(VectorStore):
             "score": result.score,
             "payload": result.payload,
         }
-        for result in results
+        for result in results.points
     ]
 
         
