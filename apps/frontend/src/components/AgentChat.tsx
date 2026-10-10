@@ -1,10 +1,17 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAgentStream } from "@/hooks/useAgentStream";
+import { v4 as uuidv4 } from "uuid";
 
 export default function AgentChat() {
     const [input, setInput] = useState("");
+    const jobIdRef = useRef<string>("");
+    
+    // In a real app, token would come from a Context provider or auth hook.
+    // This requires backend changes to skip validation or provide a test token.
+    const DUMMY_TOKEN = "TEST_TOKEN"; 
+
     const {
         responseContent,
         agentState,
@@ -17,7 +24,9 @@ export default function AgentChat() {
 
     const handleSend = () => {
         if (!input.trim()) return;
-        submitQuery(input, "test-user-123");
+        const newJobId = uuidv4();
+        jobIdRef.current = newJobId;
+        submitQuery(input, newJobId, DUMMY_TOKEN);
         setInput("");
     };
 
@@ -45,13 +54,13 @@ export default function AgentChat() {
                         </div>
                         <div className="flex gap-2">
                             <button
-                                onClick={() => resumeQuery("test-user-123", "approve")}
+                                onClick={() => resumeQuery(jobIdRef.current, "approve", DUMMY_TOKEN)}
                                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold transition"
                             >
                                 Approve Execution
                             </button>
                             <button
-                                onClick={() => resumeQuery("test-user-123", "reject")}
+                                onClick={() => resumeQuery(jobIdRef.current, "reject", DUMMY_TOKEN)}
                                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-semibold transition"
                             >
                                 Reject Action

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     embedding_model: str
     secret_key :str
     database_url:str
+    qdrant_url: str = "http://localhost:6333"
     access_token_expire_minutes: int
     model_config = SettingsConfigDict(
         env_file=".env",

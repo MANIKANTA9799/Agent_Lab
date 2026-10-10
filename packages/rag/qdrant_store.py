@@ -5,10 +5,13 @@ from qdrant_client import QdrantClient, models
 from packages.rag.interfaces import VectorStore
 
 
+from packages.config.settings import settings
+
 class QdrantVectorStore(VectorStore):
 
     def __init__(self):
-        self.client = QdrantClient(path="./qdrant_data")
+        # Prevent file lock issues in multiple workers by using a network URL
+        self.client = QdrantClient(url=settings.qdrant_url)
         self.collection_name = "research_chunks"
 
         if not self.client.collection_exists(self.collection_name):

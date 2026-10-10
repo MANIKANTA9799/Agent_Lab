@@ -1,29 +1,32 @@
 import json
 import asyncio
 from typing import AsyncGenerator
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage, ToolMessage
+from langsmith import traceable
 
 from packages.agent.graph import agent_graph
+from apps.api.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
 class AgentRequest(BaseModel):
     query: str
-    user_id: str
+    job_id: str  # Use job_id instead of user_id for thread_id to prevent collision
 
 class ResumeRequest(BaseModel):
-    user_id: str
+    job_id: str
     action: str  # "approve" or "reject"
 
-async def event_generator(query: str, user_id: str) -> AsyncGenerator[str, None]:
+@traceable(name="agentlab-stream")
+async def event_generator(query: str, job_id: str, user_id: str) -> AsyncGenerator[str, None]:
     state_update = {
         "messages": [HumanMessage(content=query)],
-        "user_id": user_id,
+        "user_id": user_id,  # Securely injected from token
     }
-    config = {"configurable": {"thread_id": user_id}}
+    config = {"configurable": {"thread_id": job_id}}
 
     try:
         async for event in agent_graph.astream_events(
@@ -53,10 +56,8 @@ async def event_generator(query: str, user_id: str) -> AsyncGenerator[str, None]
 
             await asyncio.sleep(0.01)
 
-        # Inspect the persisted graph state after the execution loop finishes
         current_state = agent_graph.get_state(config) #type:ignore
         
-        # If 'next' contains a node (e.g., 'tools'), we hit a HITL breakpoint
         if current_state.next:
             payload = {"type": "interrupt", "pending_node": current_state.next[0]}
             yield f"data: {json.dumps(payload)}\n\n"
@@ -66,13 +67,23 @@ async def event_generator(query: str, user_id: str) -> AsyncGenerator[str, None]
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
-async def resume_generator(user_id: str, action: str) -> AsyncGenerator[str, None]:
-    config = {"configurable": {"thread_id": user_id}}
+@traceable(name="agentlab-resume")
+async def resume_generator(job_id: str, action: str, user_id: str) -> AsyncGenerator[str, None]:
+    config = {"configurable": {"thread_id": job_id}}
+    state = agent_graph.get_state(config) #type:ignore
+    
+    if not state or not state.next:
+        yield f"data: {json.dumps({'type': 'error', 'message': 'Job is not in an interrupted state'})}\n\n"
+        return
+
+    # Security check: Ensure the user owns this job state
+    # (Since we are using MemorySaver, state might not strictly enforce this without DB. We check state dict.)
+    if state.values.get("user_id") != user_id:
+        yield f"data: {json.dumps({'type': 'error', 'message': 'Unauthorized job access'})}\n\n"
+        return
 
     if action == "reject":
-        state = agent_graph.get_state(config) #type:ignore
         last_message = state.values["messages"][-1]
-
         if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             rejection_msg = ToolMessage(
                 content="Action REJECTED by human supervisor. You must use an alternative strategy or ask the user for clarification.",
@@ -82,7 +93,6 @@ async def resume_generator(user_id: str, action: str) -> AsyncGenerator[str, Non
             agent_graph.update_state(config, {"messages": [rejection_msg]}, as_node="tools") #type:ignore
 
     try:
-        # Passing None tells LangGraph to continue execution
         async for event in agent_graph.astream_events(None, config=config, version="v2"): #type:ignore
             event_type = event.get("event")
 
@@ -116,17 +126,23 @@ async def resume_generator(user_id: str, action: str) -> AsyncGenerator[str, Non
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
 @router.post("/stream")
-async def stream_agent_execution(request: AgentRequest):
+async def stream_agent_execution(
+    request: AgentRequest,
+    current_user: dict = Depends(get_current_user)
+):
     return StreamingResponse(
-        event_generator(query=request.query, user_id=request.user_id),
+        event_generator(query=request.query, job_id=request.job_id, user_id=current_user["id"]),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )
 
 @router.post("/resume")
-async def resume_agent_execution(request: ResumeRequest):
+async def resume_agent_execution(
+    request: ResumeRequest,
+    current_user: dict = Depends(get_current_user)
+):
     return StreamingResponse(
-        resume_generator(user_id=request.user_id, action=request.action),
+        resume_generator(job_id=request.job_id, action=request.action, user_id=current_user["id"]),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )

@@ -61,17 +61,22 @@ export function useAgentStream() {
         }
     };
 
-    const submitQuery = async (query: string, userId: string) => {
+    const submitQuery = async (query: string, jobId: string, token: string = "") => {
         setIsProcessing(true);
         setIsInterrupted(false);
         setResponseContent("");
         setAgentState({ node: "reasoner", tool: "", input: "" });
 
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
         try {
-            const response = await fetch("http://127.0.0.1:8000/api/v1/agent/stream", {
+            const response = await fetch(`${apiUrl}/api/v1/agent/stream`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query, user_id: userId }),
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}` 
+                },
+                body: JSON.stringify({ query, job_id: jobId }),
             });
             await processStream(response);
         } catch (error) {
@@ -80,15 +85,20 @@ export function useAgentStream() {
         }
     };
 
-    const resumeQuery = async (userId: string, action: "approve" | "reject") => {
+    const resumeQuery = async (jobId: string, action: "approve" | "reject", token: string = "") => {
         setIsProcessing(true);
         setIsInterrupted(false);
 
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
         try {
-            const response = await fetch("http://127.0.0.1:8000/api/v1/agent/resume", {
+            const response = await fetch(`${apiUrl}/api/v1/agent/resume`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: userId, action }),
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}` 
+                },
+                body: JSON.stringify({ job_id: jobId, action }),
             });
             await processStream(response);
         } catch (error) {

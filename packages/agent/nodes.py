@@ -27,8 +27,8 @@ def tool_node(state: AgentState) -> dict:
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
 
-        # If user_id is missing from tool_args, inject it from AgentState for security
-        if "user_id" not in tool_args and "user_id" in state:
+        # Forcefully inject user_id from AgentState for security (prevent IDOR)
+        if "user_id" in state:
             tool_args["user_id"] = state["user_id"]
 
         # Look up tool in registry and execute
@@ -71,7 +71,7 @@ If the Agent Answer is specific, grounded, and answers the query, respond ONLY w
     
     # Use a fresh, fast LLM call (temperature=0 for deterministic evaluation)
     critic_llm = ChatOllama(model="llama3.1:latest", temperature=0)
-    evaluation = critic_llm.invoke([SystemMessage(content=eval_prompt)])
+    evaluation = await critic_llm.ainvoke([SystemMessage(content=eval_prompt)])
     
     # If rejected, append the rejection as a HumanMessage to force the Reasoner to fix it
     if "REJECT" in evaluation.content.upper(): #type:ignore 

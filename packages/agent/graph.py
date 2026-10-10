@@ -37,8 +37,16 @@ builder.add_conditional_edges("reasoner", reasoner_router)
 builder.add_edge("tools", "reasoner")
 builder.add_conditional_edges("critic", critic_router)
 
-memory = MemorySaver()
+from langgraph.checkpoint.postgres import PostgresSaver
+from psycopg_pool import ConnectionPool
+from packages.config.settings import settings
+
+# Create a connection pool for durable state checkpointing across workers
+pool = ConnectionPool(conninfo=settings.database_url, max_size=20, open=True)
+checkpointer = PostgresSaver(pool)
+checkpointer.setup()  # Ensures the checkpoints tables exist
+
 agent_graph = builder.compile(
-    checkpointer=memory,
+    checkpointer=checkpointer,
     interrupt_before=["tools"]
 )

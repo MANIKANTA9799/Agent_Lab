@@ -25,10 +25,16 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
+from apps.api.routers.documents import router as documents_router
+
 app.include_router(
     research_router,
     prefix="/api/research",
 )
 
+app.include_router(
+    documents_router,
+    prefix="/api/v1",
+)
 
 app.include_router(agent_router, prefix="/api/v1")

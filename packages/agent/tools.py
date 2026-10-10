@@ -1,11 +1,13 @@
 from langchain_core.tools import tool 
 from packages.rag.embeddings import OllamaEmbeddingProvider
 from packages.rag.qdrant_store import  QdrantVectorStore
-from packages.rag.retriever import  Retriever
+from packages.rag.retriever import Retriever
+from packages.rag.reranker import Reranker
 
 _embedder = OllamaEmbeddingProvider()
 _vector_store = QdrantVectorStore()
-_retriever = Retriever(embedder=_embedder, vector_store=_vector_store)
+_reranker = Reranker(model_name="cross-encoder/ms-marco-MiniLM-L-6-v2")
+_retriever = Retriever(embedder=_embedder, vector_store=_vector_store, reranker=_reranker)
 @tool
 def search_research_knowledgebase(query: str, user_id: str) -> str:
     """
