@@ -1,12 +1,23 @@
 from fastapi import FastAPI
 
 from apps.api.routers.research import router as research_router
-
-
+from packages.api.agent_router import router as agent_router
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+load_dotenv()
 app = FastAPI(
     title="AgentLab API",
     version="1.0.0",
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 @app.get("/health")
@@ -18,3 +29,6 @@ app.include_router(
     research_router,
     prefix="/api/research",
 )
+
+
+app.include_router(agent_router, prefix="/api/v1")
